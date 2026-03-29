@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>同人誌・ZINE作家のための本文組版フォーマット for Affinity - PDF縦書き補正ツール</title>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 40px;
+      background: #f5f5f5;
+    }
+    .box {
+      border: 2px dashed #aaa;
+      padding: 40px;
+      background: white;
+      cursor: pointer;
+    }
+    .box.dragover {
+      border-color: #007bff;
+      background: #eef6ff;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>同人誌・ZINE作家のための本文組版フォーマット for Affinity - PDF縦書き補正ツール</h1>
+<p>PDFをアップするとページ順を自動補正します</p>
+
+<div class="box" id="drop">
+  PDFをここにドラッグ＆ドロップ<br>
+  またはクリックして選択
+</div>
+
+<input type="file" id="file" accept="application/pdf" style="display:none">
+
+<p id="status"></p>
+
+<script>
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+const status = document.getElementById('status');
+
+drop.onclick = () => fileInput.click();
+
+drop.ondragover = (e) => {
+  e.preventDefault();
+  drop.classList.add('dragover');
+};
+
+drop.ondragleave = () => {
+  drop.classList.remove('dragover');
+};
+
+drop.ondrop = (e) => {
+  e.preventDefault();
+  drop.classList.remove('dragover');
+  handleFile(e.dataTransfer.files[0]);
+};
+
+fileInput.onchange = () => {
+  handleFile(fileInput.files[0]);
+};
+
+function reorderPages(total) {
+  const result = [0]; // 0-indexなので1ページ目は0
+
+  for (let i = 1; i < total; i += 2) {
+    if (i + 1 < total) {
+      result.push(i + 1);
+      result.push(i);
+    } else {
+      result.push(i);
+    }
+  }
+
+  return result;
+}
+
+async function handleFile(file) {
+  if (!file) return;
+  
+  if (file.type !== "application/pdf") {
+    status.textContent = "PDFファイルを選択してください";
+    return;
+  }
+
+  status.textContent = "処理中...";
+
+  const arrayBuffer = await file.arrayBuffer();
+
+  const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+  const newPdf = await PDFLib.PDFDocument.create();
+
+  const total = pdf.getPageCount();
+
+  status.textContent = `ページ数: ${total}`;
+  await new Promise(r => setTimeout(r, 300));
+
+  status.textContent = "ページ並び替え中...";
+  await new Promise(r => setTimeout(r, 300)); 
+
+  const order = reorderPages(total);
+
+  const pages = await newPdf.copyPages(pdf, order);
+
+  pages.forEach(p => newPdf.addPage(p));
+
+  const bytes = await newPdf.save();
+
+  const newName = file.name.replace(/\.pdf$/i, "_fixed.pdf");
+  download(bytes, newName);
+
+  status.textContent = "完了！ダウンロードされました";
+}
+
+function download(bytes, filename) {
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+</script>
+
+</body>
+</html>
